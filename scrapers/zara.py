@@ -9,54 +9,72 @@ class ZaraScraper(BaseScraper):
 
     def search(self, keyword: str) -> list:
         deals = []
-        kw_lower = keyword.lower()
+        kw_words = keyword.lower().split()
         for section, url in ZARA_SALE_URLS.items():
             try:
                 with sync_playwright() as p:
                     browser, context = self.get_browser_context(p)
                     page = context.new_page()
-                    page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                    self.random_delay(2, 4)
-                    page.wait_for_selector("[class*='product-grid']", timeout=15000)
+                    page.goto(url, timeout=40000, wait_until="domcontentloaded")
+                    self.random_delay(3, 5)
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=20000)
+                    except:
+                        pass
 
                     # scroll to load more items
                     for _ in range(3):
                         page.keyboard.press("End")
                         self.random_delay(1, 2)
 
-                    items = page.query_selector_all("[class*='product-grid-product']")
+                    items = page.evaluate("""
+                        () => {
+                            const results = [];
+                            const cards = document.querySelectorAll('li[class*="product"], article[class*="product"], [class*="product-grid-product"]');
+                            cards.forEach(card => {
+                                const text = card.innerText || '';
+                                // Zara discount: "-X%" badge + strikethrough price
+                                const hasDiscount = /\\-\\d+%/.test(text);
+                                const hasStrike = card.querySelector('s, del, [class*="line-through"]');
+                                if (!hasDiscount && !hasStrike) return;
+
+                                const link = card.querySelector('a');
+                                const img = card.querySelector('img');
+                                const prices = text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
+                                const badgeEl = card.querySelector('[class*="discount"], [class*="sale"], [class*="percent"]');
+                                const nameEl = card.querySelector('[class*="name"], [class*="title"], h2, h3');
+
+                                results.push({
+                                    name: nameEl ? nameEl.innerText : text.split('\\n')[0],
+                                    label: badgeEl ? badgeEl.innerText : 'Sale',
+                                    prices: prices,
+                                    url: link ? link.href : '',
+                                    image: img ? (img.src || img.dataset.src || '') : ''
+                                });
+                            });
+                            return results;
+                        }
+                    """)
+
                     for item in items:
-                        name_el = item.query_selector("[class*='product-name'], [class*='product-grid-product-info__name']")
-                        if not name_el:
+                        name = item.get("name", "").strip()
+                        prices = item.get("prices", [])
+                        # filter: only items whose name contains at least one keyword word
+                        if not name or not any(w in name.lower() for w in kw_words):
                             continue
-                        name = name_el.inner_text().strip()
-
-                        # only include items matching the keyword
-                        if not any(word in name.lower() for word in kw_lower.split()):
+                        if len(prices) < 1:
                             continue
-
-                        # Zara discount signals: "-X%" badge + strikethrough price
-                        badge_el = item.query_selector("[class*='sale-discount'], [class*='discount-promotion-label'], [class*='percent']")
-                        orig_el = item.query_selector("s, del, [class*='line-through'], [class*='original-price']")
-
-                        if not badge_el and not orig_el:
-                            continue
-
-                        price_el = item.query_selector("[class*='price__amount']:not(s):not(del), [data-qa-qualifier='price']")
-                        link_el = item.query_selector("a")
-                        img_el = item.query_selector("img")
-
-                        current = self._parse_price(price_el.inner_text()) if price_el else None
-                        original = self._parse_price(orig_el.inner_text()) if orig_el else None
-                        label = badge_el.inner_text().strip() if badge_el else "Sale"
-                        href = link_el.get_attribute("href") if link_el else ""
+                        current = self._parse_price(prices[0])
+                        original = self._parse_price(prices[1]) if len(prices) > 1 else None
+                        if original and original < current:
+                            current, original = original, current
+                        label = item.get("label", "Sale").strip() or "Sale"
+                        href = item.get("url", "")
                         if href and not href.startswith("http"):
                             href = "https://www.zara.com" + href
-                        img = img_el.get_attribute("src") if img_el else ""
-
                         if current:
-                            deals.append(self.make_deal(keyword, name, current, original, label, href, img))
-
+                            deals.append(self.make_deal(keyword, name, current, original, label,
+                                                         href, item.get("image", "")))
                     browser.close()
             except Exception as e:
                 print(f"[Zara/{section}] Error for '{keyword}': {e}")
@@ -65,5 +83,5 @@ class ZaraScraper(BaseScraper):
     def _parse_price(self, text: str) -> float:
         if not text:
             return None
-        match = re.search(r"[\d,]+\.?\d*", text.replace(",", ""))
+        match = re.search(r"[\d,]+\.?\d*", str(text).replace(",", ""))
         return float(match.group()) if match else None

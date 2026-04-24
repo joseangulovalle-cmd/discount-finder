@@ -13,39 +13,52 @@ class PotteryBarnScraper(BaseScraper):
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
-                page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                self.random_delay()
-                page.wait_for_selector(".grid-catalog", timeout=15000)
+                page.goto(url, timeout=40000, wait_until="domcontentloaded")
+                self.random_delay(3, 5)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                except:
+                    pass
 
-                items = page.query_selector_all(".product-grid-container .product-tile")
+                items = page.evaluate("""
+                    () => {
+                        const results = [];
+                        const cards = document.querySelectorAll('[class*="product"], [class*="Product"], li[class*="grid"]');
+                        cards.forEach(card => {
+                            const text = card.innerText || '';
+                            const hasSale = /limited time|sale|special offer|was \\$/i.test(text);
+                            const hasStrike = card.querySelector('s, del, [style*="line-through"]');
+                            if (!hasSale && !hasStrike) return;
+
+                            const link = card.querySelector('a[href*="/"]');
+                            const img = card.querySelector('img');
+                            const prices = text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
+
+                            results.push({
+                                name: (card.querySelector('a, h2, h3, [class*="name"], [class*="title"]') || {}).innerText || '',
+                                label: (card.querySelector('[class*="sale"], [class*="promo"], [class*="badge"]') || {}).innerText || 'Sale',
+                                prices: prices,
+                                url: link ? link.href : '',
+                                image: img ? (img.src || img.dataset.src || '') : ''
+                            });
+                        });
+                        return results;
+                    }
+                """)
+
                 for item in items:
-                    sale_label_el = item.query_selector(".price-special, .sale-flag, [class*='special'], [class*='sale-label']")
-                    if not sale_label_el:
-                        # look for strikethrough price as fallback signal
-                        if not item.query_selector(".product-price s, .price s, del"):
-                            continue
-
-                    name_el = item.query_selector(".product-name a, h2 a, .name a")
-                    price_el = item.query_selector(".price-special, .sale-price, [class*='special-price']")
-                    orig_el = item.query_selector(".price-regular s, del, s")
-                    img_el = item.query_selector("img")
-                    link_el = item.query_selector("a")
-
-                    if not name_el or not price_el:
+                    name = item.get("name", "").strip()
+                    prices = item.get("prices", [])
+                    if not name or len(prices) < 1:
                         continue
-
-                    name = name_el.inner_text().strip()
-                    label = sale_label_el.inner_text().strip() if sale_label_el else "Sale"
-                    current = self._parse_price(price_el.inner_text())
-                    original = self._parse_price(orig_el.inner_text()) if orig_el else None
-                    href = link_el.get_attribute("href") if link_el else ""
-                    if href and not href.startswith("http"):
-                        href = "https://www.potterybarn.ca" + href
-                    img = img_el.get_attribute("src") if img_el else ""
-
+                    current = self._parse_price(prices[0])
+                    original = self._parse_price(prices[1]) if len(prices) > 1 else None
+                    if original and original < current:
+                        current, original = original, current
+                    label = item.get("label", "Sale").strip() or "Sale"
                     if current:
-                        deals.append(self.make_deal(keyword, name, current, original, label, href, img))
-
+                        deals.append(self.make_deal(keyword, name, current, original, label,
+                                                     item.get("url", ""), item.get("image", "")))
                 browser.close()
         except Exception as e:
             print(f"[PotteryBarn] Error for '{keyword}': {e}")
@@ -54,5 +67,5 @@ class PotteryBarnScraper(BaseScraper):
     def _parse_price(self, text: str) -> float:
         if not text:
             return None
-        match = re.search(r"[\d,]+\.?\d*", text.replace(",", ""))
+        match = re.search(r"[\d,]+\.?\d*", str(text).replace(",", ""))
         return float(match.group()) if match else None

@@ -13,46 +13,53 @@ class IkeaScraper(BaseScraper):
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
-                page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                self.random_delay(2, 4)
-                page.wait_for_selector("[class*='plp-fragment-wrapper'], [class*='search-results']", timeout=15000)
+                page.goto(url, timeout=40000, wait_until="domcontentloaded")
+                self.random_delay(3, 5)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                except:
+                    pass
 
-                items = page.query_selector_all("[class*='pip-product-compact'], [class*='product-card']")
+                items = page.evaluate("""
+                    () => {
+                        const results = [];
+                        // IKEA uses web components - look broadly
+                        const cards = document.querySelectorAll('[class*="pip-product"], [class*="plp-product"], [class*="search-result"]');
+                        cards.forEach(card => {
+                            const text = card.innerText || '';
+                            // IKEA discount signal: "New lower price" + "Previous price"
+                            const hasDiscount = /new lower price|previous price/i.test(text);
+                            if (!hasDiscount) return;
+
+                            const link = card.querySelector('a');
+                            const img = card.querySelector('img');
+                            const prices = text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
+                            const nameEl = card.querySelector('[class*="title"], [class*="name"], h3');
+
+                            results.push({
+                                name: nameEl ? nameEl.innerText : text.split('\\n')[0],
+                                label: 'New lower price',
+                                prices: prices,
+                                url: link ? link.href : '',
+                                image: img ? (img.src || img.dataset.src || '') : ''
+                            });
+                        });
+                        return results;
+                    }
+                """)
+
                 for item in items:
-                    # IKEA's discount signal: "New lower price" label
-                    label_el = item.query_selector("[class*='pip-price-package__previous-price'], [class*='new-lower']")
-                    prev_price_el = item.query_selector("[class*='pip-price-package__previous-price'] [class*='pip-price__integer'], [class*='previous-price']")
-
-                    if not label_el and not prev_price_el:
-                        # check for any "new lower price" text
-                        text_content = item.inner_text()
-                        if "new lower price" not in text_content.lower():
-                            continue
-
-                    name_el = item.query_selector("[class*='pip-header-section__title'], h3, [class*='product-name']")
-                    desc_el = item.query_selector("[class*='pip-header-section__description'], [class*='product-description']")
-                    price_int = item.query_selector("[class*='pip-price__integer']")
-                    link_el = item.query_selector("a[href*='/ca/en/p/']")
-                    img_el = item.query_selector("img")
-
-                    if not name_el or not price_int:
+                    name = item.get("name", "").strip()
+                    prices = item.get("prices", [])
+                    if not name or len(prices) < 1:
                         continue
-
-                    full_name = name_el.inner_text().strip()
-                    if desc_el:
-                        full_name += " - " + desc_el.inner_text().strip()
-
-                    current = self._parse_price(price_int.inner_text())
-                    original = self._parse_price(prev_price_el.inner_text()) if prev_price_el else None
-                    label = "New lower price"
-                    href = link_el.get_attribute("href") if link_el else ""
-                    if href and not href.startswith("http"):
-                        href = "https://www.ikea.com" + href
-                    img = img_el.get_attribute("src") if img_el else ""
-
+                    current = self._parse_price(prices[0])
+                    original = self._parse_price(prices[1]) if len(prices) > 1 else None
+                    if original and original < current:
+                        current, original = original, current
                     if current:
-                        deals.append(self.make_deal(keyword, full_name, current, original, label, href, img))
-
+                        deals.append(self.make_deal(keyword, name, current, original, "New lower price",
+                                                     item.get("url", ""), item.get("image", "")))
                 browser.close()
         except Exception as e:
             print(f"[IKEA] Error for '{keyword}': {e}")
@@ -61,5 +68,5 @@ class IkeaScraper(BaseScraper):
     def _parse_price(self, text: str) -> float:
         if not text:
             return None
-        match = re.search(r"[\d,]+\.?\d*", text.replace(",", ""))
+        match = re.search(r"[\d,]+\.?\d*", str(text).replace(",", ""))
         return float(match.group()) if match else None

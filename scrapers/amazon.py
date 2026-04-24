@@ -8,57 +8,66 @@ class AmazonScraper(BaseScraper):
 
     def search(self, keyword: str) -> list:
         deals = []
-        # rh=p_n_deal_type%3A23566065011 filters for "Today's Deals" on amazon.ca
-        url = (
-            f"https://www.amazon.ca/s?k={keyword.replace(' ', '+')}"
-            f"&rh=p_n_deal_type%3A23566065011&i=garden"
-        )
+        url = f"https://www.amazon.ca/s?k={keyword.replace(' ', '+')}&i=garden"
         try:
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
-                page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                self.random_delay(2, 5)
+                page.goto(url, timeout=40000, wait_until="domcontentloaded")
+                self.random_delay(3, 5)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                except:
+                    pass
 
-                items = page.query_selector_all("[data-component-type='s-search-result']")
+                items = page.evaluate("""
+                    () => {
+                        const results = [];
+                        const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
+                        cards.forEach(card => {
+                            const text = card.innerText || '';
+                            // discount signals: List price, savings %, countdown, "Typical"
+                            const hasDeal = /list:|save \\d+%|typical:|ends in|\\d+%\\s*off/i.test(text);
+                            const hasListPrice = card.querySelector('.a-price.a-text-price, [data-a-strike]');
+                            if (!hasDeal && !hasListPrice) return;
+
+                            const link = card.querySelector('h2 a, a[href*="/dp/"]');
+                            const img = card.querySelector('img.s-image');
+                            const nameEl = card.querySelector('h2 span');
+                            const priceWhole = card.querySelector('.a-price-whole');
+                            const priceFrac = card.querySelector('.a-price-fraction');
+                            const listPrice = card.querySelector('.a-price.a-text-price .a-offscreen, .a-text-price .a-offscreen');
+                            const savingEl = card.querySelector('.savingsPercentage, [class*="savings"]');
+
+                            const whole = priceWhole ? priceWhole.innerText.replace(/[^\\d]/g, '') : '';
+                            const frac = priceFrac ? priceFrac.innerText.replace(/[^\\d]/g, '') : '00';
+
+                            results.push({
+                                name: nameEl ? nameEl.innerText : '',
+                                label: savingEl ? savingEl.innerText : (hasDeal ? 'Deal' : 'Sale'),
+                                currentPrice: whole ? `${whole}.${frac}` : '',
+                                originalPrice: listPrice ? listPrice.innerText : '',
+                                url: link ? link.href : '',
+                                image: img ? img.src : ''
+                            });
+                        });
+                        return results;
+                    }
+                """)
+
                 for item in items:
-                    # discount signals: savings badge, list price, or countdown
-                    savings_el = item.query_selector(".savingsPercentage, [class*='savings'], .a-badge-text")
-                    list_price_el = item.query_selector(".a-text-price span[aria-hidden='true'], .a-price.a-text-price")
-                    countdown_el = item.query_selector("[class*='deal-badge'], [id*='deal-badge']")
-
-                    if not savings_el and not list_price_el and not countdown_el:
+                    name = item.get("name", "").strip()
+                    if not name:
                         continue
-
-                    name_el = item.query_selector("h2 span, h2 a span")
-                    price_whole = item.query_selector(".a-price-whole")
-                    price_frac = item.query_selector(".a-price-fraction")
-                    link_el = item.query_selector("h2 a")
-                    img_el = item.query_selector("img.s-image")
-
-                    if not name_el or not price_whole:
-                        continue
-
-                    name = name_el.inner_text().strip()
-                    frac = price_frac.inner_text().strip() if price_frac else "00"
-                    current = self._parse_price(f"{price_whole.inner_text()}.{frac}")
-                    original = self._parse_price(list_price_el.inner_text()) if list_price_el else None
-
-                    if savings_el:
-                        label = savings_el.inner_text().strip()
-                    elif countdown_el:
-                        label = countdown_el.inner_text().strip()
-                    else:
-                        label = "Deal"
-
-                    href = link_el.get_attribute("href") if link_el else ""
+                    current = self._parse_price(item.get("currentPrice", ""))
+                    original = self._parse_price(item.get("originalPrice", ""))
+                    label = item.get("label", "Deal").strip() or "Deal"
+                    href = item.get("url", "")
                     if href and not href.startswith("http"):
                         href = "https://www.amazon.ca" + href
-                    img = img_el.get_attribute("src") if img_el else ""
-
                     if current:
-                        deals.append(self.make_deal(keyword, name, current, original, label, href, img))
-
+                        deals.append(self.make_deal(keyword, name, current, original, label,
+                                                     href, item.get("image", "")))
                 browser.close()
         except Exception as e:
             print(f"[Amazon] Error for '{keyword}': {e}")
@@ -67,5 +76,5 @@ class AmazonScraper(BaseScraper):
     def _parse_price(self, text: str) -> float:
         if not text:
             return None
-        match = re.search(r"[\d,]+\.?\d*", text.replace(",", ""))
+        match = re.search(r"[\d,]+\.?\d*", str(text).replace(",", ""))
         return float(match.group()) if match else None
