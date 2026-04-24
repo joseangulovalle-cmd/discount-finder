@@ -8,6 +8,13 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
 ]
 
+STEALTH_SCRIPT = """
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-CA', 'en'] });
+    window.chrome = { runtime: {} };
+"""
+
 
 class BaseScraper:
     store_name = ""
@@ -19,17 +26,28 @@ class BaseScraper:
         time.sleep(random.uniform(min_s, max_s))
 
     def get_browser_context(self, playwright):
-        browser = playwright.chromium.launch(headless=True)
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+        )
         context = browser.new_context(
             user_agent=random.choice(USER_AGENTS),
             locale="en-CA",
             timezone_id="America/Toronto",
-            viewport={"width": 1280, "height": 800},
+            viewport={"width": 1280, "height": 900},
+            extra_http_headers={"Accept-Language": "en-CA,en;q=0.9"}
         )
+        context.add_init_script(STEALTH_SCRIPT)
         return browser, context
 
+    def wait_for_page(self, page, timeout=25000):
+        try:
+            page.wait_for_load_state("networkidle", timeout=timeout)
+        except:
+            pass
+        page.wait_for_timeout(4000)
+
     def search(self, keyword: str) -> list:
-        """Return list of deal dicts for the given keyword. Override per store."""
         raise NotImplementedError
 
     def make_deal(self, keyword, product_name, current_price, original_price,

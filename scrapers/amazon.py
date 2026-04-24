@@ -8,53 +8,54 @@ class AmazonScraper(BaseScraper):
 
     def search(self, keyword: str) -> list:
         deals = []
-        url = f"https://www.amazon.ca/s?k={keyword.replace(' ', '+')}&i=garden"
+        url = f"https://www.amazon.ca/s?k={keyword.replace(' ', '+')}"
         try:
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
                 page.goto(url, timeout=40000, wait_until="domcontentloaded")
-                self.random_delay(3, 5)
-                try:
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                except:
-                    pass
+                self.wait_for_page(page)
+
+                total_cards = page.evaluate(
+                    "() => document.querySelectorAll('[data-component-type=\"s-search-result\"]').length"
+                )
+                print(f"    [Amazon] Total product cards found: {total_cards}")
 
                 items = page.evaluate("""
                     () => {
                         const results = [];
-                        const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
-                        cards.forEach(card => {
+                        document.querySelectorAll('[data-component-type="s-search-result"]').forEach(card => {
                             const text = card.innerText || '';
-                            // discount signals: List price, savings %, countdown, "Typical"
-                            const hasDeal = /list:|save \\d+%|typical:|ends in|\\d+%\\s*off/i.test(text);
-                            const hasListPrice = card.querySelector('.a-price.a-text-price, [data-a-strike]');
-                            if (!hasDeal && !hasListPrice) return;
+                            // discount signals
+                            const hasListPrice = card.querySelector('.a-price.a-text-price');
+                            const hasSavings = /save \\d+%|\\d+%\\s*off|list:|typical:/i.test(text);
+                            if (!hasListPrice && !hasSavings) return;
 
-                            const link = card.querySelector('h2 a, a[href*="/dp/"]');
+                            const link = card.querySelector('h2 a');
                             const img = card.querySelector('img.s-image');
                             const nameEl = card.querySelector('h2 span');
                             const priceWhole = card.querySelector('.a-price-whole');
                             const priceFrac = card.querySelector('.a-price-fraction');
-                            const listPrice = card.querySelector('.a-price.a-text-price .a-offscreen, .a-text-price .a-offscreen');
-                            const savingEl = card.querySelector('.savingsPercentage, [class*="savings"]');
+                            const listPriceEl = card.querySelector('.a-price.a-text-price .a-offscreen');
+                            const savingEl = card.querySelector('.savingsPercentage');
 
-                            const whole = priceWhole ? priceWhole.innerText.replace(/[^\\d]/g, '') : '';
-                            const frac = priceFrac ? priceFrac.innerText.replace(/[^\\d]/g, '') : '00';
+                            const whole = priceWhole ? priceWhole.innerText.replace(/[^\\d]/g,'') : '';
+                            const frac  = priceFrac  ? priceFrac.innerText.replace(/[^\\d]/g,'') : '00';
 
                             results.push({
-                                name: nameEl ? nameEl.innerText : '',
-                                label: savingEl ? savingEl.innerText : (hasDeal ? 'Deal' : 'Sale'),
+                                name: nameEl ? nameEl.innerText.trim() : '',
+                                label: savingEl ? savingEl.innerText.trim() : 'Deal',
                                 currentPrice: whole ? `${whole}.${frac}` : '',
-                                originalPrice: listPrice ? listPrice.innerText : '',
+                                originalPrice: listPriceEl ? listPriceEl.innerText.trim() : '',
                                 url: link ? link.href : '',
                                 image: img ? img.src : ''
                             });
                         });
-                        return results;
+                        return results.slice(0, 20);
                     }
                 """)
 
+                print(f"    [Amazon] Discounted items found: {len(items)}")
                 for item in items:
                     name = item.get("name", "").strip()
                     if not name:

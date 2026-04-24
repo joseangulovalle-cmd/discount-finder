@@ -14,39 +14,41 @@ class EtsyScraper(BaseScraper):
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
                 page.goto(url, timeout=40000, wait_until="domcontentloaded")
-                self.random_delay(3, 5)
-                try:
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                except:
-                    pass
+                self.wait_for_page(page)
+
+                total_cards = page.evaluate("() => document.querySelectorAll('li').length")
+                print(f"    [Etsy] Total <li> elements found: {total_cards}")
 
                 items = page.evaluate("""
                     () => {
                         const results = [];
-                        const cards = document.querySelectorAll('li[class*="wt-list"], div[data-search-result], li[data-search-result]');
-                        cards.forEach(card => {
+                        // Etsy uses <li> for product grid items
+                        document.querySelectorAll('li').forEach(card => {
                             const text = card.innerText || '';
+                            if (text.length < 10) return;
                             const hasOff = /\\d+%\\s*off|off\\s*\\d+%/i.test(text);
                             const hasStrike = card.querySelector('s, del');
                             if (!hasOff && !hasStrike) return;
 
-                            const link = card.querySelector('a[href*="/listing/"]');
+                            const link = card.querySelector('a[href*="etsy.com"], a[href*="/listing/"]');
                             const img = card.querySelector('img');
-                            const prices = text.match(/CA\\$[\\d,]+\\.?\\d*/g) || [];
+                            const prices = text.match(/CA\\$[\\d,]+\\.?\\d*/g) || text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
                             const offMatch = text.match(/(\\d+)%\\s*off/i);
+                            const nameMatch = text.split('\\n').find(l => l.length > 5 && !/\\$|%|off|CA/i.test(l));
 
                             results.push({
-                                name: (card.querySelector('h3, [class*="listing"]') || {}).innerText || '',
+                                name: nameMatch || text.substring(0, 60),
                                 label: offMatch ? offMatch[0] : 'Sale',
                                 prices: prices,
                                 url: link ? link.href : '',
-                                image: img ? (img.src || img.dataset.src || '') : ''
+                                image: img ? (img.src || '') : ''
                             });
                         });
-                        return results;
+                        return results.slice(0, 20);
                     }
                 """)
 
+                print(f"    [Etsy] Discounted items found: {len(items)}")
                 for item in items:
                     name = item.get("name", "").strip()
                     prices = item.get("prices", [])

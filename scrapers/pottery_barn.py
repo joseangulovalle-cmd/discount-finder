@@ -14,42 +14,45 @@ class PotteryBarnScraper(BaseScraper):
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
                 page.goto(url, timeout=40000, wait_until="domcontentloaded")
-                self.random_delay(3, 5)
-                try:
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                except:
-                    pass
+                self.wait_for_page(page)
+
+                total = page.evaluate("() => document.querySelectorAll('li, article').length")
+                print(f"    [PotteryBarn] Total li/article elements: {total}")
 
                 items = page.evaluate("""
                     () => {
                         const results = [];
-                        const cards = document.querySelectorAll('[class*="product"], [class*="Product"], li[class*="grid"]');
-                        cards.forEach(card => {
+                        document.querySelectorAll('li, article').forEach(card => {
                             const text = card.innerText || '';
-                            const hasSale = /limited time|sale|special offer|was \\$/i.test(text);
+                            if (text.length < 15) return;
+                            const hasSale = /limited time|sale|special offer/i.test(text);
                             const hasStrike = card.querySelector('s, del, [style*="line-through"]');
                             if (!hasSale && !hasStrike) return;
 
-                            const link = card.querySelector('a[href*="/"]');
+                            const link = card.querySelector('a[href*="potterybarn"]');
                             const img = card.querySelector('img');
                             const prices = text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
+                            const nameEl = card.querySelector('a, h2, h3');
+                            const labelEl = card.querySelector('[class*="sale"], [class*="badge"], [class*="promo"]');
 
+                            if (prices.length < 1) return;
                             results.push({
-                                name: (card.querySelector('a, h2, h3, [class*="name"], [class*="title"]') || {}).innerText || '',
-                                label: (card.querySelector('[class*="sale"], [class*="promo"], [class*="badge"]') || {}).innerText || 'Sale',
+                                name: nameEl ? nameEl.innerText.trim().substring(0, 100) : '',
+                                label: labelEl ? labelEl.innerText.trim() : 'Sale',
                                 prices: prices,
                                 url: link ? link.href : '',
-                                image: img ? (img.src || img.dataset.src || '') : ''
+                                image: img ? (img.src || '') : ''
                             });
                         });
-                        return results;
+                        return results.slice(0, 20);
                     }
                 """)
 
+                print(f"    [PotteryBarn] Discounted items found: {len(items)}")
                 for item in items:
                     name = item.get("name", "").strip()
                     prices = item.get("prices", [])
-                    if not name or len(prices) < 1:
+                    if not name or not prices:
                         continue
                     current = self._parse_price(prices[0])
                     original = self._parse_price(prices[1]) if len(prices) > 1 else None
