@@ -2,24 +2,10 @@ import json
 import os
 from datetime import datetime
 
-from config import PRODUCTS_FILE, RESULTS_FILE, STORES
-from scrapers.pottery_barn import PotteryBarnScraper
-from scrapers.etsy import EtsyScraper
-from scrapers.amazon import AmazonScraper
-from scrapers.ikea import IkeaScraper
-from scrapers.hm import HMScraper
-from scrapers.zara import ZaraScraper
+from config import PRODUCTS_FILE, RESULTS_FILE
+from scrapers.google_shopping import GoogleShoppingScraper
 from notifier import send_notification
 from generator import generate_html
-
-SCRAPER_MAP = {
-    "pottery_barn": PotteryBarnScraper,
-    "etsy": EtsyScraper,
-    "amazon": AmazonScraper,
-    "ikea": IkeaScraper,
-    "hm": HMScraper,
-    "zara": ZaraScraper,
-}
 
 
 def load_products():
@@ -29,19 +15,17 @@ def load_products():
 
 def run():
     products = load_products()
-    print(f"Searching for {len(products)} product(s) across {len(STORES)} store(s)...")
+    print(f"Searching for {len(products)} product(s) via Google Shopping...")
 
+    scraper = GoogleShoppingScraper()
     all_deals = []
-    for store_key in STORES:
-        scraper_class = SCRAPER_MAP.get(store_key)
-        if not scraper_class:
-            continue
-        scraper = scraper_class()
-        for keyword in products:
-            print(f"  [{scraper.store_name}] Searching: '{keyword}'")
-            deals = scraper.search(keyword)
-            print(f"    Found {len(deals)} deal(s)")
-            all_deals.extend(deals)
+
+    for keyword in products:
+        print(f"  Searching: '{keyword}'")
+        deals = scraper.search(keyword)
+        print(f"  Found {len(deals)} deal(s) for '{keyword}'")
+        all_deals.extend(deals)
+        scraper.random_delay(3, 6)
 
     results = {
         "last_updated": datetime.utcnow().isoformat() + "Z",
