@@ -5,11 +5,6 @@ from .base import BaseScraper
 
 SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
 
-STORE_KEYWORDS = [
-    "pottery barn", "etsy", "amazon", "ikea", "h&m", "zara",
-    "west elm", "cb2", "structube", "wayfair", "homesense"
-]
-
 
 class GoogleShoppingScraper(BaseScraper):
     store_name = "Google Shopping"
@@ -28,90 +23,87 @@ class GoogleShoppingScraper(BaseScraper):
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
-                page.goto(url, timeout=40000, wait_until="domcontentloaded")
+                page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 self.wait_for_page(page)
 
-                import os
                 os.makedirs("data/screenshots", exist_ok=True)
-                screenshot_path = f"data/screenshots/{keyword.replace(' ', '_')}.png"
-                page.screenshot(path=screenshot_path, full_page=False)
-                print(f"    [Google Shopping] Screenshot saved: {screenshot_path}")
-
-                page_title = page.title()
-                print(f"    [Google Shopping] Page title: {page_title}")
-
-                total = page.evaluate("() => document.querySelectorAll('div[class*=\"sh-dgr\"], .sh-pr__product-results-grid > div').length")
-                print(f"    [Google Shopping] Total product cards: {total}")
+                page.screenshot(path=f"data/screenshots/{keyword.replace(' ', '_')}.png", full_page=False)
+                print(f"    [Google Shopping] Page title: {page.title()}")
 
                 items = page.evaluate("""
                     () => {
                         const results = [];
 
-                        // Google Shopping product cards
-                        const selectors = [
-                            '.sh-dgr__grid-result',
-                            '.sh-pr__product-results-grid > div',
-                            '[data-docid]',
-                            '.KZmu8e',
-                            '.i0X6df'
-                        ];
+                        // Strategy: find all elements that contain "% OFF" text
+                        // then walk up to find the product card container
+                        const allElements = Array.from(document.querySelectorAll('*'));
+                        const offBadges = allElements.filter(el => {
+                            const t = el.innerText || '';
+                            return /^\\d+%\\s*OFF$/i.test(t.trim()) && el.children.length === 0;
+                        });
 
-                        let cards = [];
-                        for (const sel of selectors) {
-                            cards = Array.from(document.querySelectorAll(sel));
-                            if (cards.length > 0) break;
-                        }
+                        console.log('OFF badges found:', offBadges.length);
 
-                        console.log('Cards found with selector:', cards.length);
+                        offBadges.forEach(badge => {
+                            // walk up to find the product card (has image, name, price)
+                            let card = badge.parentElement;
+                            for (let i = 0; i < 8; i++) {
+                                if (!card) break;
+                                const hasImg = card.querySelector('img');
+                                const text = card.innerText || '';
+                                const hasPrices = (text.match(/\\$[\\d.]+/g) || []).length >= 2;
+                                if (hasImg && hasPrices) break;
+                                card = card.parentElement;
+                            }
+                            if (!card) return;
 
-                        cards.forEach(card => {
                             const text = card.innerText || '';
-                            if (text.length < 10) return;
-
-                            // discount signals: strikethrough price OR % off text
-                            const hasStrike = card.querySelector('s, del, [style*="line-through"]');
-                            const hasOff = /\\d+%\\s*off|was\\s+\\$|save\\s+\\$/i.test(text);
-                            if (!hasStrike && !hasOff) return;
-
-                            // extract name
-                            const nameEl = card.querySelector('h3, [class*="title"], [class*="name"]');
-                            const name = nameEl ? nameEl.innerText.trim() : text.split('\\n')[0].trim();
-
-                            // extract store
-                            const storeEl = card.querySelector('[class*="merchant"], [class*="store"], .aULzUe, .E5ocAb');
-                            const store = storeEl ? storeEl.innerText.trim() : '';
-
-                            // extract prices
                             const prices = text.match(/\\$[\\d,]+\\.?\\d*/g) || [];
+                            if (prices.length < 1) return;
 
-                            // extract discount label
-                            const offMatch = text.match(/(\\d+%\\s*off|save\\s+\\$[\\d.]+)/i);
-                            const label = offMatch ? offMatch[0] : 'Sale';
+                            // product name: first meaningful text line
+                            const lines = text.split('\\n').map(l => l.trim()).filter(l =>
+                                l.length > 5 && !/^\\$|^\\d+%|^\\d\\.\\d|free|delivery|return/i.test(l)
+                            );
+                            const name = lines[0] || '';
 
-                            // extract link
+                            // store name: look for known patterns
+                            const storeEl = card.querySelector('[class*="merchant"], [class*="store"], [class*="seller"]');
+                            const storeText = storeEl ? storeEl.innerText.trim() : '';
+
+                            // link
                             const link = card.querySelector('a[href]');
                             const href = link ? link.href : '';
 
-                            // extract image
+                            // image
                             const img = card.querySelector('img');
                             const image = img ? img.src : '';
 
-                            if (name && prices.length > 0) {
-                                results.push({ name, store, prices, label, url: href, image });
-                            }
+                            // discount label
+                            const label = badge.innerText.trim();
+
+                            results.push({ name, store: storeText, prices, label, url: href, image });
                         });
+
                         return results;
                     }
                 """)
 
                 print(f"    [Google Shopping] Discounted items for '{keyword}': {len(items)}")
 
+                seen = set()
                 for item in items:
                     name = item.get("name", "").strip()
                     store = item.get("store", "").strip() or self._detect_store(item.get("url", ""))
                     prices = item.get("prices", [])
                     if not name or not prices:
                         continue
+
+                    # deduplicate
+                    key = f"{name}_{prices[0]}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
 
                     current = self._parse_price(prices[0])
                     original = self._parse_price(prices[1]) if len(prices) > 1 else None
@@ -133,9 +125,12 @@ class GoogleShoppingScraper(BaseScraper):
         return deals
 
     def _detect_store(self, url: str) -> str:
-        url_lower = url.lower()
-        for store in STORE_KEYWORDS:
-            if store.replace("&", "").replace(" ", "") in url_lower.replace("&", "").replace(" ", ""):
+        stores = ["potterybarn", "etsy", "amazon", "ikea", "hm", "zara",
+                  "westelm", "cb2", "structube", "wayfair", "walmart",
+                  "crateandbarrel", "homesense", "chapters", "indigo"]
+        url_lower = url.lower().replace("-", "").replace(".", "")
+        for store in stores:
+            if store in url_lower:
                 return store.title()
         return ""
 
