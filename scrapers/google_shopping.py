@@ -24,6 +24,15 @@ class GoogleShoppingScraper(BaseScraper):
                 page.goto(url, timeout=40000, wait_until="domcontentloaded")
                 self.wait_for_page(page)
 
+                import os
+                os.makedirs("data/screenshots", exist_ok=True)
+                screenshot_path = f"data/screenshots/{keyword.replace(' ', '_')}.png"
+                page.screenshot(path=screenshot_path, full_page=False)
+                print(f"    [Google Shopping] Screenshot saved: {screenshot_path}")
+
+                page_title = page.title()
+                print(f"    [Google Shopping] Page title: {page_title}")
+
                 total = page.evaluate("() => document.querySelectorAll('div[class*=\"sh-dgr\"], .sh-pr__product-results-grid > div').length")
                 print(f"    [Google Shopping] Total product cards: {total}")
 

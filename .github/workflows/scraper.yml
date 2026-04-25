@@ -32,6 +32,14 @@ jobs:
           NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
         run: python main.py
 
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: data/screenshots/
+          retention-days: 3
+
       - name: Commit and push results
         run: |
           git config user.name "github-actions[bot]"
