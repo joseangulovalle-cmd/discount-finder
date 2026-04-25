@@ -1,6 +1,9 @@
 import re
+import os
 from playwright.sync_api import sync_playwright
 from .base import BaseScraper
+
+SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
 
 STORE_KEYWORDS = [
     "pottery barn", "etsy", "amazon", "ikea", "h&m", "zara",
@@ -13,9 +16,13 @@ class GoogleShoppingScraper(BaseScraper):
 
     def search(self, keyword: str) -> list:
         deals = []
-        url = (
+        google_url = (
             f"https://www.google.com/search?q={keyword.replace(' ', '+')}"
             f"+sale+discount&tbm=shop&gl=ca&hl=en"
+        )
+        url = (
+            f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}"
+            f"&url={google_url}&render=true&country_code=ca"
         )
         try:
             with sync_playwright() as p:
