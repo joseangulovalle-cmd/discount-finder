@@ -71,19 +71,24 @@ class GoogleShoppingScraper(BaseScraper):
                             const storeEl = card.querySelector('[class*="merchant"], [class*="store"], [class*="seller"]');
                             const storeText = storeEl ? storeEl.innerText.trim() : '';
 
-                            // link — find best anchor: prefer direct store URLs over google redirects
-                            const allLinks = Array.from(card.querySelectorAll('a[href]'));
+                            // link — walk up from card to find nearest anchor
                             let href = '';
+                            const allLinks = Array.from(card.querySelectorAll('a'));
                             for (const a of allLinks) {
-                                const h = a.href || '';
-                                if (h.startsWith('http') && !h.includes('google.com/search') && !h.includes('google.com/shopping')) {
+                                const h = a.href || a.getAttribute('href') || '';
+                                if (h && h !== '#' && h !== 'javascript:void(0)') {
                                     href = h;
                                     break;
                                 }
                             }
+                            // also check parent elements for wrapping anchor
                             if (!href) {
-                                const first = card.querySelector('a[href]');
-                                href = first ? first.href : '';
+                                let el = card.parentElement;
+                                for (let i = 0; i < 4; i++) {
+                                    if (!el) break;
+                                    if (el.tagName === 'A' && el.href) { href = el.href; break; }
+                                    el = el.parentElement;
+                                }
                             }
 
                             // image
