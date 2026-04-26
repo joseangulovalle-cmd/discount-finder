@@ -322,11 +322,12 @@
 <!-- PRODUCT MANAGER -->
 <div class="product-manager">
   <div class="pm-title">
-    My Product List &nbsp;<span class="pm-counter" id="pm-counter">1 of 6</span>
+    My Product List &nbsp;<span class="pm-counter" id="pm-counter">2 of 6</span>
   </div>
   <div class="pm-row">
     <div id="tags-container">
       <span class="product-tag" data-keyword="organic cotton sheets">organic cotton sheets <button onclick="removeProduct('organic cotton sheets')">×</button></span>
+      <span class="product-tag" data-keyword="cycling shoes">cycling shoes <button onclick="removeProduct('cycling shoes')">×</button></span>
       
     </div>
     <div class="pm-input-group">
@@ -339,7 +340,7 @@
 <!-- FILTERS BAR -->
 <div class="filters-bar">
   <div class="summary-text">
-    <strong id="visible-count">40</strong> deals found across <strong>1</strong> products
+    <strong id="visible-count">40</strong> deals found across <strong>2</strong> products
   </div>
   <div class="heart-legend">
     <span>❤️ Like</span>
@@ -350,6 +351,7 @@
     <select id="product-filter" onchange="applyFilters()">
       <option value="all">All Products</option>
       <option value="organic cotton sheets">Organic Cotton Sheets (40)</option>
+      <option value="cycling shoes">Cycling Shoes (0)</option>
 
     </select>
     <select id="store-filter" onchange="applyFilters()">
@@ -1154,6 +1156,25 @@
     const saved = localStorage.getItem(`heart_${id}`);
     if (saved) btn.textContent = saved;
   });
+
+  async function loadProducts() {
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      const container = document.getElementById('tags-container');
+      container.innerHTML = '';
+      data.products.forEach(kw => {
+        const tag = document.createElement('span');
+        tag.className = 'product-tag';
+        tag.dataset.keyword = kw;
+        tag.innerHTML = `${kw} <button onclick="removeProduct('${kw}')">×</button>`;
+        container.appendChild(tag);
+      });
+      updateCounter();
+      rebuildProductDropdown();
+    } catch(e) { /* keep static tags if API fails */ }
+  }
+  loadProducts();
 
   function toggleHeart(btn, id) {
     const next = HEARTS[btn.textContent] || '❤️';

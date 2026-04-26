@@ -508,6 +508,25 @@ def generate_html(results: dict, products: list):
     if (saved) btn.textContent = saved;
   }});
 
+  async function loadProducts() {{
+    try {{
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      const container = document.getElementById('tags-container');
+      container.innerHTML = '';
+      data.products.forEach(kw => {{
+        const tag = document.createElement('span');
+        tag.className = 'product-tag';
+        tag.dataset.keyword = kw;
+        tag.innerHTML = `${{kw}} <button onclick="removeProduct('${{kw}}')">×</button>`;
+        container.appendChild(tag);
+      }});
+      updateCounter();
+      rebuildProductDropdown();
+    }} catch(e) {{ /* keep static tags if API fails */ }}
+  }}
+  loadProducts();
+
   function toggleHeart(btn, id) {{
     const next = HEARTS[btn.textContent] || '❤️';
     btn.textContent = next;
