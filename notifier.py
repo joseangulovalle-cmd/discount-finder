@@ -3,14 +3,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from config import GMAIL_USER, GMAIL_APP_PASSWORD, NOTIFY_EMAILS
 
-STORE_COLORS = {
-    "Pottery Barn": "#8B4513",
-    "Etsy": "#F56400",
-    "Amazon": "#FF9900",
-    "IKEA": "#0058A3",
-    "H&M": "#E50010",
-    "Zara": "#000000",
-}
+WEB_URL = "https://joseangulovalle-cmd.github.io/discount-finder/"
 
 
 def build_email_html(results: dict, products: list) -> str:
@@ -25,23 +18,38 @@ def build_email_html(results: dict, products: list) -> str:
 
         cards = ""
         for d in keyword_deals:
-            store_color = STORE_COLORS.get(d["store"], "#333")
-            discount_badge = f'<span style="background:#e53e3e;color:white;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:bold;">{d["discount_pct"]}% OFF</span>' if d["discount_pct"] else ""
-            original_price = f'<span style="text-decoration:line-through;color:#999;font-size:13px;">CA${d["original_price"]:.2f}</span> ' if d["original_price"] else ""
-            img_html = f'<img src="{d["image_url"]}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;margin-right:12px;" />' if d["image_url"] else ""
+            discount_badge = (
+                f'<span style="background:#C96B50;color:white;padding:2px 10px;'
+                f'border-radius:12px;font-size:11px;font-weight:700;">'
+                f'{d["discount_pct"]}% OFF</span>'
+            ) if d["discount_pct"] else (
+                f'<span style="background:#C96B50;color:white;padding:2px 10px;'
+                f'border-radius:12px;font-size:11px;font-weight:700;">'
+                f'{d.get("discount_label","Sale")}</span>'
+            )
+            original_price = (
+                f'<span style="text-decoration:line-through;color:#aaa;font-size:12px;">'
+                f'CA${d["original_price"]:.2f}</span>&nbsp;'
+            ) if d["original_price"] else ""
+            img_html = (
+                f'<img src="{d["image_url"]}" style="width:72px;height:72px;'
+                f'object-fit:cover;border-radius:6px;" />'
+            ) if d["image_url"] else (
+                f'<div style="width:72px;height:72px;background:#f0ebe6;'
+                f'border-radius:6px;"></div>'
+            )
 
             cards += f"""
             <tr>
-              <td style="padding:12px;border-bottom:1px solid #eee;">
+              <td style="padding:14px 0;border-bottom:1px solid #f0ebe6;">
                 <table cellpadding="0" cellspacing="0" border="0" width="100%">
                   <tr>
-                    <td style="width:80px;vertical-align:top;">{img_html}</td>
-                    <td style="vertical-align:top;padding-left:12px;">
-                      <div style="font-size:11px;font-weight:bold;color:{store_color};margin-bottom:4px;">{d['store'].upper()}</div>
-                      <div style="font-size:14px;font-weight:500;margin-bottom:6px;">{d['product_name']}</div>
-                      <div style="margin-bottom:6px;">{original_price}<strong style="font-size:16px;">CA${d['current_price']:.2f}</strong> {discount_badge}</div>
-                      <div style="font-size:11px;color:#888;margin-bottom:8px;">{d['discount_label']}</div>
-                      <a href="{d['url']}" style="background:#2b6cb0;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:13px;">Buy Now</a>
+                    <td style="width:72px;vertical-align:top;">{img_html}</td>
+                    <td style="vertical-align:top;padding-left:14px;">
+                      <div style="font-size:10px;font-weight:700;color:#B8A9C9;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;">{d['store']}</div>
+                      <div style="font-size:13px;font-weight:600;color:#2d2d2d;margin-bottom:6px;line-height:1.3;">{d['product_name']}</div>
+                      <div style="margin-bottom:8px;">{original_price}<strong style="font-size:15px;color:#2d2d2d;">CA${d['current_price']:.2f}</strong>&nbsp;&nbsp;{discount_badge}</div>
+                      <a href="{d['url']}" style="background:#C96B50;color:white;padding:6px 16px;border-radius:20px;text-decoration:none;font-size:12px;font-weight:600;">Buy Now →</a>
                     </td>
                   </tr>
                 </table>
@@ -49,29 +57,63 @@ def build_email_html(results: dict, products: list) -> str:
             </tr>"""
 
         sections += f"""
-        <tr><td style="padding:16px 0 8px;font-size:18px;font-weight:bold;border-bottom:2px solid #2b6cb0;color:#2b6cb0;">
-          {keyword.title()} — {len(keyword_deals)} deal(s) found
-        </td></tr>
+        <tr>
+          <td style="padding:18px 0 6px;">
+            <div style="font-size:13px;font-weight:700;color:#B8A9C9;text-transform:uppercase;letter-spacing:.1em;border-left:3px solid #C96B50;padding-left:10px;">
+              {keyword.title()} &mdash; {len(keyword_deals)} deal(s)
+            </div>
+          </td>
+        </tr>
         {cards}
-        <tr><td style="height:20px;"></td></tr>"""
+        <tr><td style="height:10px;"></td></tr>"""
 
     if not sections:
         return ""
 
     return f"""
-    <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
-      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-        <tr><td style="background:#2b6cb0;padding:20px;text-align:center;">
-          <h1 style="color:white;margin:0;font-size:22px;">Deal Finder — Daily Update</h1>
-          <p style="color:#bee3f8;margin:6px 0 0;font-size:13px;">Updated: {last_updated[:10]}</p>
-        </td></tr>
-        <tr><td style="padding:16px;">
-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
-            {sections}
+    <html><body style="margin:0;padding:0;background:#FAF0EB;font-family:'Segoe UI',Arial,sans-serif;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#FAF0EB;">
+        <tr><td align="center" style="padding:24px 16px;">
+
+          <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+            <!-- HEADER -->
+            <tr>
+              <td style="background:linear-gradient(135deg,#C96B50,#B85A40);padding:28px 32px;">
+                <div style="font-size:22px;font-weight:700;color:white;margin-bottom:4px;">🏷️ Deal Finder</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.8);">Automated discount tracker across Canadian online stores</div>
+                <div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.9);">
+                  <strong style="color:white;">{results['total_deals']} deals</strong> found today &nbsp;·&nbsp; {last_updated[:10]}
+                </div>
+              </td>
+            </tr>
+
+            <!-- CTA BUTTON -->
+            <tr>
+              <td style="padding:20px 32px 8px;text-align:center;background:white;">
+                <a href="{WEB_URL}" style="display:inline-block;background:#C96B50;color:white;padding:13px 36px;border-radius:30px;text-decoration:none;font-size:15px;font-weight:700;letter-spacing:.01em;">
+                  Ver todos los deals →
+                </a>
+              </td>
+            </tr>
+
+            <!-- DEALS -->
+            <tr>
+              <td style="padding:8px 32px 16px;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                  {sections}
+                </table>
+              </td>
+            </tr>
+
+            <!-- FOOTER -->
+            <tr>
+              <td style="background:#FAF0EB;padding:16px 32px;text-align:center;font-size:11px;color:#B8A9C9;">
+                Recibes este email porque estás suscrito a Deal Finder alerts.
+              </td>
+            </tr>
+
           </table>
-        </td></tr>
-        <tr><td style="background:#f7fafc;padding:16px;text-align:center;font-size:12px;color:#999;">
-          You're receiving this because you subscribed to Deal Finder alerts.
         </td></tr>
       </table>
     </body></html>"""
@@ -83,7 +125,7 @@ def send_notification(results: dict, products: list):
         return
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Deal Finder: {results['total_deals']} deal(s) found today"
+    msg["Subject"] = f"🏷️ Deal Finder: {results['total_deals']} deal(s) encontrados hoy"
     msg["From"] = GMAIL_USER
     msg["To"] = ", ".join([e for e in NOTIFY_EMAILS if e])
     msg.attach(MIMEText(html_body, "html"))
