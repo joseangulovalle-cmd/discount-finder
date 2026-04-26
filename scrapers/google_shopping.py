@@ -44,6 +44,21 @@ class GoogleShoppingScraper(BaseScraper):
 
                         console.log('OFF badges found:', offBadges.length);
 
+                        // debug: log all hrefs found on first badge card
+                        if (offBadges.length > 0) {
+                            let dbgCard = offBadges[0].parentElement;
+                            for (let i = 0; i < 8; i++) {
+                                if (!dbgCard) break;
+                                if (dbgCard.querySelector('img') && (dbgCard.innerText.match(/\\$[\\d.]+/g)||[]).length >= 2) break;
+                                dbgCard = dbgCard.parentElement;
+                            }
+                            if (dbgCard) {
+                                const dbgLinks = Array.from(dbgCard.querySelectorAll('a'));
+                                console.log('DEBUG links in first card:', dbgLinks.length);
+                                dbgLinks.forEach((a,i) => console.log('  link', i, 'href=', a.getAttribute('href'), 'full=', a.href));
+                            }
+                        }
+
                         offBadges.forEach(badge => {
                             // walk up to find the product card (has image, name, price)
                             let card = badge.parentElement;
