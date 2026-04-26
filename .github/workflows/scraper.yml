@@ -2,8 +2,8 @@ name: Deal Finder
 
 on:
   schedule:
-    # 5am ET = 9am UTC (UTC-4 summer) / 10am UTC (UTC-5 winter)
-    - cron: "0 9 * * *"
+    # midnight ET = 4am UTC (UTC-4 summer) / 5am UTC (UTC-5 winter)
+    - cron: "0 4 * * *"
   workflow_dispatch:   # allows manual trigger from GitHub
 
 jobs:
