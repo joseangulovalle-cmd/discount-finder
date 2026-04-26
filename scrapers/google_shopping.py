@@ -43,23 +43,6 @@ class GoogleShoppingScraper(BaseScraper):
                             return /^\\d+%\\s*OFF$/i.test(t.trim()) && el.children.length === 0;
                         });
 
-                        console.log('OFF badges found:', offBadges.length);
-
-                        // debug: log all hrefs found on first badge card
-                        if (offBadges.length > 0) {
-                            let dbgCard = offBadges[0].parentElement;
-                            for (let i = 0; i < 8; i++) {
-                                if (!dbgCard) break;
-                                if (dbgCard.querySelector('img') && (dbgCard.innerText.match(/\\$[\\d.]+/g)||[]).length >= 2) break;
-                                dbgCard = dbgCard.parentElement;
-                            }
-                            if (dbgCard) {
-                                const dbgLinks = Array.from(dbgCard.querySelectorAll('a'));
-                                console.log('DEBUG links in first card:', dbgLinks.length);
-                                dbgLinks.forEach((a,i) => console.log('  link', i, 'href=', a.getAttribute('href'), 'full=', a.href));
-                            }
-                        }
-
                         offBadges.forEach(badge => {
                             // walk up to find the product card (has image, name, price)
                             let card = badge.parentElement;
@@ -87,25 +70,9 @@ class GoogleShoppingScraper(BaseScraper):
                             const storeEl = card.querySelector('[class*="merchant"], [class*="store"], [class*="seller"]');
                             const storeText = storeEl ? storeEl.innerText.trim() : '';
 
-                            // link — walk up from card to find nearest anchor
-                            let href = '';
-                            const allLinks = Array.from(card.querySelectorAll('a'));
-                            for (const a of allLinks) {
-                                const h = a.href || a.getAttribute('href') || '';
-                                if (h && h !== '#' && h !== 'javascript:void(0)') {
-                                    href = h;
-                                    break;
-                                }
-                            }
-                            // also check parent elements for wrapping anchor
-                            if (!href) {
-                                let el = card.parentElement;
-                                for (let i = 0; i < 4; i++) {
-                                    if (!el) break;
-                                    if (el.tagName === 'A' && el.href) { href = el.href; break; }
-                                    el = el.parentElement;
-                                }
-                            }
+                            // Google Shopping uses JS click handlers — no <a href> in cards
+                            // fallback: construct a Google Shopping search URL for the product
+                            const href = '';
 
                             // image
                             const img = card.querySelector('img');
@@ -145,7 +112,10 @@ class GoogleShoppingScraper(BaseScraper):
                         current, original = original, current
 
                     label = item.get("label", "Sale").strip() or "Sale"
-                    href = item.get("url", "")
+                    encoded = name.replace(" ", "+")
+                    href = (
+                        f"https://www.google.com/search?q={encoded}&tbm=shop&gl=ca&hl=en"
+                    )
                     image = item.get("image", "")
 
                     if current:
