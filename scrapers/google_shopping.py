@@ -23,6 +23,7 @@ class GoogleShoppingScraper(BaseScraper):
             with sync_playwright() as p:
                 browser, context = self.get_browser_context(p)
                 page = context.new_page()
+                page.on("console", lambda msg: print(f"    [Browser] {msg.text}") if msg.type in ("log", "error") else None)
                 page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 self.wait_for_page(page)
 
