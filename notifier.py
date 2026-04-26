@@ -31,10 +31,11 @@ def build_email_html(results: dict, products: list) -> str:
                 f'<span style="text-decoration:line-through;color:#aaa;font-size:12px;">'
                 f'CA${d["original_price"]:.2f}</span>&nbsp;'
             ) if d["original_price"] else ""
+            img_url = d["image_url"] if d.get("image_url", "").startswith("https://") else ""
             img_html = (
-                f'<img src="{d["image_url"]}" style="width:72px;height:72px;'
+                f'<img src="{img_url}" style="width:72px;height:72px;'
                 f'object-fit:cover;border-radius:6px;" />'
-            ) if d["image_url"] else (
+            ) if img_url else (
                 f'<div style="width:72px;height:72px;background:#f0ebe6;'
                 f'border-radius:6px;"></div>'
             )

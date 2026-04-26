@@ -109,6 +109,8 @@ class GoogleShoppingScraper(BaseScraper):
                     prices = item.get("prices", [])
                     if not name or not prices:
                         continue
+                    if re.match(r'^nearby[,\s]', name, re.IGNORECASE):
+                        continue
 
                     # deduplicate
                     key = f"{name}_{prices[0]}"
