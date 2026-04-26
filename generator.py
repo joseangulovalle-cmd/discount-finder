@@ -448,7 +448,7 @@ def generate_html(results: dict, products: list):
     </div>
     <div class="pm-input-group">
       <input class="pm-input" id="new-product-input" type="text" placeholder="e.g. wooden dining chair" />
-      <button class="pm-add-btn" onclick="addProduct()">+ Add</button>
+      <button class="pm-add-btn" id="pm-add-btn" onclick="addProduct()">+ Add</button>
     </div>
   </div>
 </div>
@@ -500,6 +500,7 @@ def generate_html(results: dict, products: list):
 <script>
   const MAX_PRODUCTS = 6;
   const HEARTS = {{ '🤍': '❤️', '❤️': '🖤', '🖤': '🤍' }};
+  const API_URL = 'https://discount-finder-five.vercel.app/api/products';
 
   document.querySelectorAll('.heart-btn').forEach(btn => {{
     const id = btn.closest('.deal-card').dataset.id;
@@ -522,7 +523,12 @@ def generate_html(results: dict, products: list):
     document.getElementById('pm-counter').textContent = `${{count}} of ${{MAX_PRODUCTS}}`;
   }}
 
-  function addProduct() {{
+  function setLoading(on) {{
+    document.getElementById('pm-add-btn').disabled = on;
+    document.getElementById('pm-add-btn').textContent = on ? 'Saving...' : '+ Add';
+  }}
+
+  async function addProduct() {{
     const input = document.getElementById('new-product-input');
     const keyword = input.value.trim().toLowerCase();
     if (!keyword) return;
@@ -531,17 +537,38 @@ def generate_html(results: dict, products: list):
       return;
     }}
     if (getProducts().includes(keyword)) {{ input.value = ''; return; }}
-    const tag = document.createElement('span');
-    tag.className = 'product-tag';
-    tag.dataset.keyword = keyword;
-    tag.innerHTML = `${{keyword}} <button onclick="removeProduct('${{keyword}}')">×</button>`;
-    document.getElementById('tags-container').appendChild(tag);
-    input.value = '';
-    updateCounter();
-    rebuildProductDropdown();
+    setLoading(true);
+    try {{
+      const res = await fetch(API_URL, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ action: 'add', product: keyword }})
+      }});
+      const data = await res.json();
+      if (!res.ok) {{ alert(data.error); return; }}
+      const tag = document.createElement('span');
+      tag.className = 'product-tag';
+      tag.dataset.keyword = keyword;
+      tag.innerHTML = `${{keyword}} <button onclick="removeProduct('${{keyword}}')">×</button>`;
+      document.getElementById('tags-container').appendChild(tag);
+      input.value = '';
+      updateCounter();
+      rebuildProductDropdown();
+    }} catch(e) {{
+      alert('Could not save. Try again.');
+    }} finally {{
+      setLoading(false);
+    }}
   }}
 
-  function removeProduct(keyword) {{
+  async function removeProduct(keyword) {{
+    try {{
+      await fetch(API_URL, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ action: 'remove', product: keyword }})
+      }});
+    }} catch(e) {{ /* UI updates regardless */ }}
     document.querySelector(`.product-tag[data-keyword="${{keyword}}"]`)?.remove();
     updateCounter();
     rebuildProductDropdown();

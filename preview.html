@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deal Finder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #FAF0EB; color: #2d3748; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #C96B50 0%, #B85A40 100%);
+      color: white;
+      padding: 22px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: none;
+    }
+    .header-left h1 { font-size: 27px; font-weight: 700; letter-spacing: -.3px; }
+    .header-left p { font-size: 13px; opacity: 0.7; margin-top: 3px; }
+    .header-stats { text-align: right; font-size: 13px; opacity: 0.9; line-height: 1.7; }
+    .header-stats strong { color: #ffffff; }
+    .gold-dot { display: inline-block; width: 6px; height: 6px; background: #ffffff; border-radius: 50%; margin: 0 6px; vertical-align: middle; }
+
+    /* PRODUCT MANAGER */
+    .product-manager {
+      background: white;
+      border-bottom: 1px solid #f0e6e0;
+      padding: 16px 36px;
+    }
+    .pm-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #2E7D52;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pm-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, #C9A84C33, transparent);
+    }
+    .pm-counter {
+      background: #f5f0ff;
+      color: #B8A9C9;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .pm-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .product-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0faf4;
+      border: 1.5px solid #7EC8A4;
+      color: #1E5C3A;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .product-tag button {
+      background: none;
+      border: none;
+      color: #E8735A;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+      font-weight: 700;
+    }
+    .product-tag button:hover { color: #c0392b; }
+    .pm-input-group { display: flex; gap: 8px; }
+    .pm-input {
+      border: 1.5px solid #d4c5be;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      width: 230px;
+      outline: none;
+      background: #fdf8f6;
+      color: #2d3748;
+    }
+    .pm-input:focus { border-color: #7EC8A4; box-shadow: 0 0 0 2px rgba(126,200,164,.18); }
+    .pm-input::placeholder { color: #c4b0a8; }
+    .pm-add-btn {
+      background: #1E5C3A;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+      letter-spacing: .02em;
+    }
+    .pm-add-btn:hover { background: #2E7D52; }
+
+    /* FILTERS BAR */
+    .filters-bar {
+      background: white;
+      border-bottom: 1px solid #f0e6e0;
+      padding: 11px 36px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .summary-text { font-size: 13px; color: #918080; flex: 1; }
+    .summary-text strong { color: #1E5C3A; }
+
+    /* HEART LEGEND */
+    .heart-legend {
+      display: flex;
+      gap: 14px;
+      font-size: 12px;
+      color: #B8A9C9;
+      align-items: center;
+      background: #f8f4ff;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid #e8e0f0;
+    }
+    .heart-legend span { display: flex; align-items: center; gap: 4px; }
+
+    .filter-controls { display: flex; gap: 10px; align-items: center; }
+    select {
+      border: 1.5px solid #d4c5be;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: #2d3748;
+      background: #fdf8f6;
+      cursor: pointer;
+      outline: none;
+    }
+    select:focus { border-color: #7EC8A4; }
+
+    /* GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+      padding: 24px 36px;
+    }
+
+    /* DEAL CARD */
+    .deal-card {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(30,92,58,.07);
+      transition: transform .2s, box-shadow .2s;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      border: 1px solid #f0ece8;
+    }
+    .deal-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 28px rgba(30,92,58,.13);
+      border-color: #C9A84C44;
+    }
+    .deal-card.hidden { display: none; }
+
+    /* gold top accent line on hover */
+    .deal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(to right, #C9A84C, #E8C97A);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .deal-card:hover::before { opacity: 1; }
+
+    .card-img-wrap { position: relative; }
+    .card-img-wrap img { width: 100%; height: 185px; object-fit: cover; display: block; }
+    .card-img-placeholder {
+      width: 100%;
+      height: 185px;
+      background: linear-gradient(135deg, #f5ede8 0%, #e8f5ee 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c4a89a;
+      font-size: 12px;
+    }
+
+    /* HEART BUTTON */
+    .heart-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,.88);
+      border: none;
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      transition: transform .15s;
+    }
+    .heart-btn:hover { transform: scale(1.18); }
+
+    /* STORE BANNER */
+    .store-banner {
+      background: #1E5C3A;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 14px;
+      letter-spacing: .05em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .store-banner .store-dot {
+      width: 5px; height: 5px;
+      background: #C9A84C;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* CARD BODY */
+    .card-body { padding: 14px; flex: 1; display: flex; flex-direction: column; }
+    .product-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      flex: 1;
+    }
+    .price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .original-price { text-decoration: line-through; color: #b8a8a0; font-size: 13px; }
+    .current-price { font-size: 20px; font-weight: 700; color: #1E5C3A; }
+    .discount-badge {
+      background: #E8735A;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 12px;
+    }
+    .sale-label { font-size: 12px; color: #B8A9C9; margin-bottom: 12px; font-style: italic; }
+    .buy-btn {
+      display: block;
+      background: linear-gradient(135deg, #E8735A, #c95f48);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      transition: opacity .2s;
+      margin-top: auto;
+      letter-spacing: .02em;
+    }
+    .buy-btn:hover { opacity: .88; }
+
+    /* POPUP */
+    .popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(30,30,30,.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .popup-overlay.show { display: flex; }
+    .popup {
+      background: white;
+      border-radius: 18px;
+      padding: 34px;
+      max-width: 370px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,.18);
+      border-top: 4px solid #C9A84C;
+    }
+    .popup-icon { font-size: 40px; margin-bottom: 12px; }
+    .popup h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #1E5C3A; }
+    .popup p { font-size: 14px; color: #918080; margin-bottom: 22px; line-height: 1.6; }
+    .popup-btn {
+      background: linear-gradient(135deg, #E8735A, #c95f48);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 28px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    footer {
+      text-align: center;
+      padding: 22px;
+      font-size: 12px;
+      color: #B8A9C9;
+      border-top: 1px solid #f0e6e0;
+      background: white;
+      margin-top: 12px;
+      letter-spacing: .03em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <h1>Deal Finder</h1>
+    <p>Automated discount tracker across Canadian online stores</p>
+  </div>
+  <div class="header-stats">
+    <div><strong id="total-count">40</strong> deals found today</div>
+    <div>Last updated: <strong>Apr 25, 2026</strong></div>
+  </div>
+</header>
+
+<!-- PRODUCT MANAGER -->
+<div class="product-manager">
+  <div class="pm-title">
+    My Product List &nbsp;<span class="pm-counter" id="pm-counter">2 of 6</span>
+  </div>
+  <div class="pm-row">
+    <div id="tags-container">
+      <span class="product-tag" data-keyword="organic cotton sheets">
+        organic cotton sheets
+        <button onclick="removeProduct('organic cotton sheets')">×</button>
+      </span>
+      <span class="product-tag" data-keyword="linen duvet cover">
+        linen duvet cover
+        <button onclick="removeProduct('linen duvet cover')">×</button>
+      </span>
+    </div>
+    <div class="pm-input-group">
+      <input class="pm-input" id="new-product-input" type="text" placeholder="e.g. wooden dining chair" />
+      <button class="pm-add-btn" id="pm-add-btn" onclick="addProduct()">+ Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- FILTERS BAR -->
+<div class="filters-bar">
+  <div class="summary-text">
+    <strong id="visible-count">40</strong> deals found across <strong>2</strong> products
+  </div>
+  <div class="heart-legend">
+    <span>❤️ Like</span>
+    <span>🖤 Don't like</span>
+    <span>🤍 Not seen</span>
+  </div>
+  <div class="filter-controls">
+    <select id="product-filter" onchange="applyFilters()">
+      <option value="all">All Products</option>
+      <option value="organic cotton sheets">Organic Cotton Sheets (40)</option>
+      <option value="linen duvet cover">Linen Duvet Cover (0)</option>
+    </select>
+    <select id="store-filter" onchange="applyFilters()">
+      <option value="all">All Stores</option>
+      <option value="amazon">Amazon</option>
+      <option value="walmart">Walmart</option>
+      <option value="crate and barrel">Crate and Barrel</option>
+    </select>
+    <select id="sort-filter" onchange="applyFilters()">
+      <option value="discount">Biggest Discount</option>
+      <option value="price-asc">Lowest Price</option>
+      <option value="price-desc">Highest Price</option>
+    </select>
+  </div>
+</div>
+
+<!-- DEAL CARDS GRID -->
+<div class="grid" id="deals-grid">
+
+  <div class="deal-card" data-keyword="organic cotton sheets" data-store="amazon" data-discount="59" data-price="40.36" data-id="1">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'1')">🤍</button>
+    </div>
+    <div class="store-banner"><span class="store-dot"></span> Amazon CA</div>
+    <div class="card-body">
+      <div class="product-name">SUPREME ELEGANCE 100% Organic Cotton Percale Sheet Set</div>
+      <div class="price-row">
+        <span class="original-price">CA$45.00</span>
+        <span class="current-price">CA$40.36</span>
+        <span class="discount-badge">59% OFF</span>
+      </div>
+      <div class="sale-label">59% off · Amazon CA</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+  <div class="deal-card" data-keyword="organic cotton sheets" data-store="amazon" data-discount="30" data-price="31.49" data-id="2">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'2')">🤍</button>
+    </div>
+    <div class="store-banner"><span class="store-dot"></span> Amazon CA</div>
+    <div class="card-body">
+      <div class="product-name">QE Home 300TC Organic Cotton Fitted Sheet</div>
+      <div class="price-row">
+        <span class="original-price">CA$45.00</span>
+        <span class="current-price">CA$31.49</span>
+        <span class="discount-badge">30% OFF</span>
+      </div>
+      <div class="sale-label">30% off · Amazon CA</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+  <div class="deal-card" data-keyword="organic cotton sheets" data-store="walmart" data-discount="25" data-price="59.99" data-id="3">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'3')">🤍</button>
+    </div>
+    <div class="store-banner" style="background:#2E7D52;"><span class="store-dot"></span> Walmart.ca</div>
+    <div class="card-body">
+      <div class="product-name">Kindlier Deep Pocket Sheet Set 100% Organic Cotton</div>
+      <div class="price-row">
+        <span class="original-price">CA$80.00</span>
+        <span class="current-price">CA$59.99</span>
+        <span class="discount-badge">25% OFF</span>
+      </div>
+      <div class="sale-label">25% off · Walmart.ca</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+  <div class="deal-card" data-keyword="organic cotton sheets" data-store="crate and barrel" data-discount="59" data-price="63.99" data-id="4">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'4')">🤍</button>
+    </div>
+    <div class="store-banner" style="background:#5C3A1E;"><span class="store-dot"></span> Crate and Barrel</div>
+    <div class="card-body">
+      <div class="product-name">Crate & Barrel Percale Twin XL Sheet Set Organic</div>
+      <div class="price-row">
+        <span class="original-price">CA$159.00</span>
+        <span class="current-price">CA$63.99</span>
+        <span class="discount-badge">59% OFF</span>
+      </div>
+      <div class="sale-label">59% off · Crate and Barrel</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+  <div class="deal-card" data-keyword="organic cotton sheets" data-store="amazon" data-discount="13" data-price="90.99" data-id="5">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'5')">🤍</button>
+    </div>
+    <div class="store-banner"><span class="store-dot"></span> Amazon CA</div>
+    <div class="card-body">
+      <div class="product-name">Bare Home Ivy Union 300 Thread Count 100% Cotton Sheet Set</div>
+      <div class="price-row">
+        <span class="original-price">CA$105.00</span>
+        <span class="current-price">CA$90.99</span>
+        <span class="discount-badge">13% OFF</span>
+      </div>
+      <div class="sale-label">13% off · Amazon CA</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+  <div class="deal-card" data-keyword="linen duvet cover" data-store="online store" data-discount="40" data-price="89.00" data-id="6">
+    <div class="card-img-wrap">
+      <div class="card-img-placeholder">No image available</div>
+      <button class="heart-btn" onclick="toggleHeart(this,'6')">🤍</button>
+    </div>
+    <div class="store-banner" style="background:#7EC8A4; color:#1E5C3A;"><span class="store-dot"></span> Online Store</div>
+    <div class="card-body">
+      <div class="product-name">100% French Linen Duvet Cover Set — King Size</div>
+      <div class="price-row">
+        <span class="original-price">CA$149.00</span>
+        <span class="current-price">CA$89.00</span>
+        <span class="discount-badge">40% OFF</span>
+      </div>
+      <div class="sale-label">40% off · Online Store</div>
+      <a href="#" class="buy-btn">Buy Now →</a>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Deal Finder &nbsp;·&nbsp; Runs daily at 5am ET &nbsp;·&nbsp; Powered by ScraperAPI + GitHub Actions
+</footer>
+
+<!-- LIMIT POPUP -->
+<div class="popup-overlay" id="limit-popup">
+  <div class="popup">
+    <div class="popup-icon">🌿</div>
+    <h3>Product limit reached</h3>
+    <p>The free plan is limited to <strong>6 products</strong>.<br>Please edit or remove one before adding a new one.</p>
+    <button class="popup-btn" onclick="closePopup()">Got it</button>
+  </div>
+</div>
+
+<script>
+  const MAX_PRODUCTS = 6;
+  const HEARTS = { '🤍': '❤️', '❤️': '🖤', '🖤': '🤍' };
+  const API_URL = 'https://discount-finder-five.vercel.app/api/products';
+
+  document.querySelectorAll('.heart-btn').forEach(btn => {
+    const id = btn.closest('.deal-card').dataset.id;
+    const saved = localStorage.getItem(`heart_${id}`);
+    if (saved) btn.textContent = saved;
+  });
+
+  function toggleHeart(btn, id) {
+    const next = HEARTS[btn.textContent] || '❤️';
+    btn.textContent = next;
+    localStorage.setItem(`heart_${id}`, next);
+  }
+
+  function getProducts() {
+    return Array.from(document.querySelectorAll('.product-tag')).map(t => t.dataset.keyword);
+  }
+
+  function updateCounter() {
+    const count = getProducts().length;
+    document.getElementById('pm-counter').textContent = `${count} of ${MAX_PRODUCTS}`;
+  }
+
+  function setLoading(on) {
+    document.getElementById('pm-add-btn').disabled = on;
+    document.getElementById('pm-add-btn').textContent = on ? 'Saving...' : '+ Add';
+  }
+
+  async function addProduct() {
+    const input = document.getElementById('new-product-input');
+    const keyword = input.value.trim().toLowerCase();
+    if (!keyword) return;
+    if (getProducts().length >= MAX_PRODUCTS) {
+      document.getElementById('limit-popup').classList.add('show');
+      return;
+    }
+    if (getProducts().includes(keyword)) { input.value = ''; return; }
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', product: keyword })
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error); return; }
+      const tag = document.createElement('span');
+      tag.className = 'product-tag';
+      tag.dataset.keyword = keyword;
+      tag.innerHTML = `${keyword} <button onclick="removeProduct('${keyword}')">×</button>`;
+      document.getElementById('tags-container').appendChild(tag);
+      input.value = '';
+      updateCounter();
+      rebuildProductDropdown();
+    } catch(e) {
+      alert('Could not save. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeProduct(keyword) {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', product: keyword })
+      });
+    } catch(e) { /* UI updates regardless */ }
+    document.querySelector(`.product-tag[data-keyword="${keyword}"]`)?.remove();
+    updateCounter();
+    rebuildProductDropdown();
+  }
+
+  function rebuildProductDropdown() {
+    const sel = document.getElementById('product-filter');
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">All Products</option>';
+    getProducts().forEach(kw => {
+      const count = document.querySelectorAll(`.deal-card[data-keyword="${kw}"]`).length;
+      const opt = document.createElement('option');
+      opt.value = kw;
+      opt.textContent = `${kw.charAt(0).toUpperCase() + kw.slice(1)} (${count})`;
+      if (kw === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function closePopup() {
+    document.getElementById('limit-popup').classList.remove('show');
+  }
+
+  function applyFilters() {
+    const productFilter = document.getElementById('product-filter').value;
+    const storeFilter = document.getElementById('store-filter').value;
+    const sortFilter = document.getElementById('sort-filter').value;
+    const cards = Array.from(document.querySelectorAll('.deal-card'));
+    cards.forEach(card => {
+      const pm = productFilter === 'all' || card.dataset.keyword === productFilter;
+      const sm = storeFilter === 'all' || card.dataset.store === storeFilter;
+      card.classList.toggle('hidden', !pm || !sm);
+    });
+    const visible = cards.filter(c => !c.classList.contains('hidden'));
+    visible.sort((a, b) => {
+      if (sortFilter === 'discount') return +b.dataset.discount - +a.dataset.discount;
+      if (sortFilter === 'price-asc') return +a.dataset.price - +b.dataset.price;
+      return +b.dataset.price - +a.dataset.price;
+    });
+    const grid = document.getElementById('deals-grid');
+    visible.forEach(card => grid.appendChild(card));
+    document.getElementById('visible-count').textContent = visible.length;
+  }
+
+  document.getElementById('new-product-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addProduct();
+  });
+</script>
+</body>
+</html>
